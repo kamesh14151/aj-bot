@@ -1,4 +1,4 @@
-import { google } from "@ai-sdk/google";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { frontendTools } from "@assistant-ui/react-ai-sdk";
 import {
   JSONSchema7,
@@ -18,6 +18,8 @@ export async function POST(req: Request) {
     );
   }
 
+  const google = createGoogleGenerativeAI({ apiKey });
+
   const {
     messages,
     system,
@@ -29,7 +31,7 @@ export async function POST(req: Request) {
   } = await req.json();
 
   const result = streamText({
-    model: google("gemini-2.5-flash-lite", { apiKey }),
+    model: google("gemini-2.5-flash-lite"),
     messages: await convertToModelMessages(messages),
     system,
     tools: {
