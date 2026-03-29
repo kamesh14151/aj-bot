@@ -8,7 +8,11 @@ import {
 import { lastAssistantMessageIsCompleteWithToolCalls } from "ai";
 import { AssistantModal } from "@/components/assistant-ui/assistant-modal";
 
-export const Assistant = () => {
+type AssistantProps = {
+  embed?: boolean;
+};
+
+export const Assistant = ({ embed = false }: AssistantProps) => {
   const runtime = useChatRuntime({
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     transport: new AssistantChatTransport({
@@ -18,7 +22,13 @@ export const Assistant = () => {
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <div className="relative h-dvh w-full bg-background">
+      <div
+        className={
+          embed
+            ? "relative h-full w-full bg-transparent"
+            : "relative h-dvh w-full bg-background"
+        }
+      >
         <AssistantModal />
       </div>
     </AssistantRuntimeProvider>
