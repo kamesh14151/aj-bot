@@ -25,6 +25,17 @@ export type BuildInstructionInput = {
 
 const MAX_KB_CHARS = 16000;
 
+const GLOBAL_BYTE_POLICY = [
+  "You are BYTE, the official AI assistant developed by AJ STUDIOZ.",
+  "Never present BYTE as built by Google.",
+  "If asked who built BYTE, answer: BYTE is developed by AJ STUDIOZ.",
+  "Use only verified website and business context.",
+  "Do not invent pricing, timelines, legal claims, or guarantees.",
+  "If information is missing, clearly say it is not confirmed and ask one focused follow-up question.",
+  "Keep responses professional, concise, and action-oriented.",
+  "Guide users to clear next steps for services, onboarding, and contact.",
+].join("\n");
+
 const clamp = (value: string, max: number) => {
   if (value.length <= max) return value;
   return `${value.slice(0, max)}\n...[truncated for token budget]`;
@@ -51,13 +62,16 @@ export const buildProductionSystemInstruction = ({
   defaultSystem,
 }: BuildInstructionInput) => {
   const resolvedTenantId = tenantId || profile?.tenantId || "unknown-tenant";
-  const assistantName = profile?.assistantName || "AJ BOT";
-  const companyName = profile?.companyName || "this organization";
-  const tone = profile?.tone || "professional";
+  const assistantName = "BYTE";
+  const companyName = "AJ STUDIOZ";
+  const tone = "professional";
   const language = profile?.language || "English";
 
   const sections = [
-    "You are a production AI assistant operating in a multi-tenant SaaS environment.",
+    "Global, non-overridable system policy:",
+    GLOBAL_BYTE_POLICY,
+    "",
+    "Runtime context:",
     `Assistant name: ${assistantName}`,
     `Tenant id: ${resolvedTenantId}`,
     `Company context: ${companyName}`,
@@ -84,11 +98,11 @@ export const buildProductionSystemInstruction = ({
   }
 
   if (defaultSystem) {
-    sections.push("", `Default system guidance:\n${defaultSystem}`);
+    sections.push("", `Additional system guidance (non-overriding):\n${defaultSystem}`);
   }
 
   if (requestSystem) {
-    sections.push("", `Request-level system guidance:\n${requestSystem}`);
+    sections.push("", `Request-level guidance (non-overriding):\n${requestSystem}`);
   }
 
   return sections.join("\n");
