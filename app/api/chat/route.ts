@@ -7,6 +7,42 @@ import {
   streamText,
   type UIMessage,
 } from "ai";
+import {
+  buildProductionSystemInstruction,
+  type KnowledgeChunk,
+  type TenantProfile,
+} from "@/lib/assistant-system-instruction";
+import { retrieveFromPinecone } from "@/lib/knowledge-base/pinecone";
+import { retrieveFromWebsite } from "@/lib/knowledge-base/website";
+
+const getLatestUserQuery = (messages: UIMessage[]) => {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i] as UIMessage & {
+      role?: string;
+      content?: string;
+      parts?: Array<{ type?: string; text?: string }>;
+    };
+
+    if (message.role !== "user") continue;
+
+    if (typeof message.content === "string" && message.content.trim()) {
+      return message.content.trim();
+    }
+
+    const textFromParts = (message.parts ?? [])
+      .map((part) => {
+        if (part.type !== "text" || !("text" in part)) return "";
+        return typeof part.text === "string" ? part.text : "";
+      })
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+
+    if (textFromParts) return textFromParts;
+  }
+
+  return "";
+};
 
 export async function POST(req: Request) {
   const apiKey =
@@ -25,11 +61,59 @@ export async function POST(req: Request) {
     messages,
     system,
     tools,
+    tenantId,
+    tenantProfile,
+    knowledgeBase,
+    pineconeTopK,
   }: {
     messages: UIMessage[];
     system?: string;
     tools?: Record<string, { description?: string; parameters: JSONSchema7 }>;
+    tenantId?: string;
+    tenantProfile?: TenantProfile;
+    knowledgeBase?: KnowledgeChunk[];
+    pineconeTopK?: number;
   } = await req.json();
+
+  const requestTenantId = tenantId ?? req.headers.get("x-tenant-id") ?? undefined;
+  const defaultSystem = process.env.ASSISTANT_DEFAULT_SYSTEM_INSTRUCTION;
+  const envAssistantName = process.env.ASSISTANT_NAME?.trim() || undefined;
+  const assistantBaseWebsite = process.env.ASSISTANT_BASE_WEB?.trim() || undefined;
+
+  const resolvedTenantProfile: TenantProfile | undefined = tenantProfile
+    ? {
+        ...tenantProfile,
+        assistantName: tenantProfile.assistantName || envAssistantName,
+      }
+    : envAssistantName
+      ? { assistantName: envAssistantName }
+      : undefined;
+
+  const latestUserQuery = getLatestUserQuery(messages);
+  const pineconeKnowledge = requestTenantId
+    ? await retrieveFromPinecone({
+        tenantId: requestTenantId,
+        query: latestUserQuery,
+        topK: pineconeTopK,
+      })
+    : [];
+  const websiteKnowledge = assistantBaseWebsite
+    ? await retrieveFromWebsite(assistantBaseWebsite)
+    : [];
+
+  const mergedKnowledgeBase = [
+    ...(knowledgeBase ?? []),
+    ...pineconeKnowledge,
+    ...websiteKnowledge,
+  ];
+
+  const systemInstruction = buildProductionSystemInstruction({
+    tenantId: requestTenantId,
+    profile: resolvedTenantProfile,
+    knowledgeBase: mergedKnowledgeBase,
+    requestSystem: system,
+    defaultSystem,
+  });
 
   const configuredDelay = Number(process.env.CHAT_STREAM_DELAY_MS ?? "28");
   const streamDelayMs =
@@ -40,7 +124,7 @@ export async function POST(req: Request) {
   const result = streamText({
     model: google("gemini-2.5-flash-lite"),
     messages: await convertToModelMessages(messages),
-    system,
+    system: systemInstruction,
     tools: {
       ...frontendTools(tools ?? {}),
     },
