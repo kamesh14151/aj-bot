@@ -33,9 +33,11 @@ import {
   RefreshCwIcon,
   SquareIcon,
 } from "lucide-react";
-import type { FC } from "react";
+import { type FC } from "react";
 
 export const Thread: FC = () => {
+  const isThreadEmpty = useAuiState((s) => s.thread.isEmpty);
+
   return (
     <ThreadPrimitive.Root
       className="aui-root aui-thread-root @container flex h-full flex-col bg-[#f7f7f8] text-[#111827]"
@@ -49,7 +51,7 @@ export const Thread: FC = () => {
         turnAnchor="top"
         className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-hidden overflow-y-scroll scroll-smooth px-4 pt-4"
       >
-        <AuiIf condition={(s) => s.thread.isEmpty}>
+        <AuiIf condition={() => isThreadEmpty}>
           <ThreadWelcome />
         </AuiIf>
 
