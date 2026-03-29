@@ -35,11 +35,15 @@ Optional production instruction baseline:
 ASSISTANT_DEFAULT_SYSTEM_INSTRUCTION=Your global policy for all tenants
 ASSISTANT_NAME=Your Bot Name
 ASSISTANT_BASE_WEB=yourcompany.com
+TAVILY_API_KEY=tvly-xxxxxxxxxxxxxxxxxxxxxxxx
+TAVILY_MAX_RESULTS=5
 ```
 
 `ASSISTANT_NAME` is used as the bot name by default (tenant request can still override it).
 
 `ASSISTANT_BASE_WEB` auto-fetches website content and injects it as additional knowledge context.
+
+If no dataset is provided in request payload, the API can use Tavily to fetch company website content from `ASSISTANT_BASE_WEB`, then upsert that context into Pinecone for the tenant.
 
 ## Getting Started
 
@@ -148,3 +152,25 @@ Optional per-request override:
 	"pineconeTopK": 8
 }
 ```
+
+Optional per-request Pinecone credentials/config (for customer-specific Pinecone projects):
+
+```json
+{
+	"tenantId": "acme-001",
+	"pineconeConfig": {
+		"apiKey": "pcsk_customer_key",
+		"indexHost": "customer-index-xxxxx.svc.us-east1-gcp.pinecone.io",
+		"namespacePrefix": "tenant-",
+		"topK": 8,
+		"embedModel": "text-embedding-004"
+	}
+}
+```
+
+Auto-bootstrap flow when dataset is missing:
+
+- Request arrives with `tenantId`
+- If no `knowledgeBase` provided and Pinecone returns no context, system fetches website context via Tavily
+- Retrieved context is chunked and upserted to tenant namespace in Pinecone
+- Query is re-run against Pinecone and used for grounded response

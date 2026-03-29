@@ -12,7 +12,12 @@ import {
   type KnowledgeChunk,
   type TenantProfile,
 } from "@/lib/assistant-system-instruction";
-import { retrieveFromPinecone } from "@/lib/knowledge-base/pinecone";
+import {
+  retrieveFromPinecone,
+  upsertKnowledgeToPinecone,
+  type PineconeClientConfig,
+} from "@/lib/knowledge-base/pinecone";
+import { retrieveFromTavilyWebsite } from "@/lib/knowledge-base/tavily";
 import { retrieveFromWebsite } from "@/lib/knowledge-base/website";
 
 const getLatestUserQuery = (messages: UIMessage[]) => {
@@ -65,6 +70,7 @@ export async function POST(req: Request) {
     tenantProfile,
     knowledgeBase,
     pineconeTopK,
+    pineconeConfig,
   }: {
     messages: UIMessage[];
     system?: string;
@@ -73,6 +79,7 @@ export async function POST(req: Request) {
     tenantProfile?: TenantProfile;
     knowledgeBase?: KnowledgeChunk[];
     pineconeTopK?: number;
+    pineconeConfig?: PineconeClientConfig;
   } = await req.json();
 
   const requestTenantId = tenantId ?? req.headers.get("x-tenant-id") ?? undefined;
@@ -90,13 +97,37 @@ export async function POST(req: Request) {
       : undefined;
 
   const latestUserQuery = getLatestUserQuery(messages);
-  const pineconeKnowledge = requestTenantId
+  let pineconeKnowledge = requestTenantId
     ? await retrieveFromPinecone({
         tenantId: requestTenantId,
         query: latestUserQuery,
         topK: pineconeTopK,
+        config: pineconeConfig,
       })
     : [];
+
+  const hasProvidedDataset = (knowledgeBase?.length ?? 0) > 0;
+
+  // If no dataset is provided and Pinecone has no context yet, bootstrap from website via Tavily.
+  if (!hasProvidedDataset && requestTenantId && !pineconeKnowledge.length && assistantBaseWebsite) {
+    const tavilyChunks = await retrieveFromTavilyWebsite(assistantBaseWebsite);
+
+    if (tavilyChunks.length) {
+      await upsertKnowledgeToPinecone({
+        tenantId: requestTenantId,
+        chunks: tavilyChunks,
+        config: pineconeConfig,
+      });
+
+      pineconeKnowledge = await retrieveFromPinecone({
+        tenantId: requestTenantId,
+        query: latestUserQuery,
+        topK: pineconeTopK,
+        config: pineconeConfig,
+      });
+    }
+  }
+
   const websiteKnowledge = assistantBaseWebsite
     ? await retrieveFromWebsite(assistantBaseWebsite)
     : [];
