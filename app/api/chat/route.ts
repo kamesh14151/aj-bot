@@ -2,8 +2,9 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { frontendTools } from "@assistant-ui/react-ai-sdk";
 import {
   JSONSchema7,
-  streamText,
   convertToModelMessages,
+  smoothStream,
+  streamText,
   type UIMessage,
 } from "ai";
 
@@ -30,6 +31,12 @@ export async function POST(req: Request) {
     tools?: Record<string, { description?: string; parameters: JSONSchema7 }>;
   } = await req.json();
 
+  const configuredDelay = Number(process.env.CHAT_STREAM_DELAY_MS ?? "28");
+  const streamDelayMs =
+    Number.isFinite(configuredDelay) && configuredDelay >= 0
+      ? configuredDelay
+      : 28;
+
   const result = streamText({
     model: google("gemini-2.5-flash-lite"),
     messages: await convertToModelMessages(messages),
@@ -37,6 +44,10 @@ export async function POST(req: Request) {
     tools: {
       ...frontendTools(tools ?? {}),
     },
+    experimental_transform: smoothStream({
+      delayInMs: streamDelayMs,
+      chunking: "word",
+    }),
   });
 
   return result.toUIMessageStreamResponse({

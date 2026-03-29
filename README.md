@@ -21,6 +21,14 @@ GOOGLE_GENERATIVE_AI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 The API route at app/api/chat/route.ts accepts either variable and uses gemini-2.5-flash-lite.
 
+Optional typing speed control:
+
+```
+CHAT_STREAM_DELAY_MS=28
+```
+
+Higher value = slower typing effect. Lower value = faster rendering.
+
 ## Getting Started
 
 Copy .env.example to .env.local and add your key.
