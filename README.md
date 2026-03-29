@@ -1,5 +1,10 @@
 This project is a Next.js + assistant-ui chatbot widget with a floating launcher, animated open and close transitions, and Gemini 2.5 Flash Lite as the model provider.
 
+Current baseline:
+
+- Repository reset to commit `038c1fa22319a628c7bfb9125c880a305a8dae36`
+- Includes multi-tenant request payload support and Tavily -> Pinecone knowledge bootstrap in `app/api/chat/route.ts`
+
 Built on top of the [assistant-ui](https://github.com/assistant-ui/assistant-ui) starter.
 
 ## Features
