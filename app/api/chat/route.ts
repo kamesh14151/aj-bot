@@ -48,6 +48,28 @@ export async function POST(req: Request) {
       delayInMs: streamDelayMs,
       chunking: "word",
     }),
+    experimental_download: async (downloads) => {
+      return Promise.all(
+        downloads.map(async ({ url }) => {
+          if (url.protocol !== "data:") return null;
+
+          try {
+            // Convert inline data URLs (from uploaded images/files) to bytes for Gemini.
+            const response = await fetch(url);
+            const buffer = await response.arrayBuffer();
+            const mediaType = response.headers.get("content-type") ?? undefined;
+
+            return {
+              data: new Uint8Array(buffer),
+              mediaType,
+            };
+          } catch {
+            // Fallback to pass-through if decoding fails.
+            return null;
+          }
+        }),
+      );
+    },
   });
 
   return result.toUIMessageStreamResponse({
