@@ -49,6 +49,22 @@ const getLatestUserQuery = (messages: UIMessage[]) => {
   return "";
 };
 
+const isIdentityQuery = (query: string) => {
+  const normalized = query.toLowerCase().replace(/[^a-z0-9\s]/g, " ");
+  if (!normalized.trim()) return false;
+
+  const asksWho = /\b(who|which company|what company|whose)\b/.test(normalized);
+  const mentionsAssistant = /\b(you|u|byte|bot|assistant)\b/.test(normalized);
+
+  // Catch common variants and typos: develop, develped, devloped, developed-by, etc.
+  const asksBuilder =
+    /\b(built|build|created|made|owner|from|by)\b/.test(normalized) ||
+    /\bdev[a-z]*\b/.test(normalized) ||
+    /\bdevel[a-z]*\b/.test(normalized);
+
+  return (mentionsAssistant && asksBuilder) || (asksWho && (asksBuilder || mentionsAssistant));
+};
+
 export async function POST(req: Request) {
   const apiKey =
     process.env.GEMINI_API_KEY ?? process.env.GOOGLE_GENERATIVE_AI_API_KEY;
@@ -142,7 +158,15 @@ export async function POST(req: Request) {
     tenantId: requestTenantId,
     profile: resolvedTenantProfile,
     knowledgeBase: mergedKnowledgeBase,
-    requestSystem: system,
+    requestSystem: isIdentityQuery(latestUserQuery)
+      ? [
+          system,
+          "For this user request, respond with exactly one sentence and no extra words:",
+          "BYTE is developed by AJ STUDIOZ.",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : system,
     defaultSystem,
   });
 
